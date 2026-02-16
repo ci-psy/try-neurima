@@ -1,3 +1,5 @@
-# Source code (keep private — only static output is public)
-site/
+# Dependencies and build output (site source is committed so GitHub Actions can rebuild)
+site/node_modules/
+site/.next/
+site/out/
 .DS_Store
