@@ -1,0 +1,7 @@
+1:"$Sreact.fragment"
+2:I[69197,["/_next/static/chunks/d2c13bb33c4fcd54.js","/_next/static/chunks/0ef4847a6efd0dd8.js","/_next/static/chunks/4e9985c48f806762.js"],""]
+3:I[63071,["/_next/static/chunks/d2c13bb33c4fcd54.js","/_next/static/chunks/0ef4847a6efd0dd8.js","/_next/static/chunks/4e9985c48f806762.js"],"Footer"]
+4:I[75049,["/_next/static/chunks/d2c13bb33c4fcd54.js","/_next/static/chunks/0ef4847a6efd0dd8.js","/_next/static/chunks/4e9985c48f806762.js"],"OutletBoundary"]
+5:"$Sreact.suspense"
+0:{"buildId":"feWLDvu_VVvXkX-DUyro1","rsc":["$","$1","c",{"children":[["$","main",null,{"id":"main","className":"min-h-screen px-6 flex flex-col","children":[["$","div",null,{"className":"flex-1 flex flex-col items-center justify-center text-center animate-page-enter","children":[["$","span",null,{"className":"inline-block text-[12px] text-muted tracking-wide uppercase border border-[var(--color-border)] rounded-full px-3 py-1 mb-4","children":"404"}],["$","h1",null,{"className":"text-[clamp(36px,6vw,64px)] font-semibold tracking-tight leading-tight mb-3","children":"Imperceptible."}],["$","p",null,{"className":"text-[17px] text-secondary mb-8","children":["Unlike our audio shifts, you'll definitely",["$","br",null,{"className":"sm:hidden"}]," notice this one's missing."]}],["$","$L2",null,{"href":"/","className":"pill-ghost","children":"Back to home"}]]}],["$","$L3",null,{}]]}],null,["$","$L4",null,{"children":["$","$5",null,{"name":"Next.MetadataOutlet","children":"$@6"}]}]]}],"loading":null,"isPartial":false}
+6:null

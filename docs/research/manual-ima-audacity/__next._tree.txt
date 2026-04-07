@@ -1,0 +1,11 @@
+:HL["/_next/static/chunks/8c06a9e6b37fd548.css","style"]
+:HL["/_next/static/media/Geist_Variable-s.p.92592eb2.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/docs/screenshots/neurima-audacity-step1-import-wide.png","image"]
+:HL["/docs/screenshots/neurima-audacity-step2-dropdown.png","image"]
+:HL["/docs/screenshots/neurima-audacity-step3-split-result.png","image"]
+:HL["/docs/screenshots/neurima-audacity-step4-selection-toolbar-samples.png","image"]
+:HL["/docs/screenshots/neurima-audacity-step5-zoomed-stems.png","image"]
+:HL["/docs/screenshots/neurima-audacity-step6-shifted-channel.png","image"]
+:HL["/docs/screenshots/neurima-audacity-step7-export-menu.png","image"]
+:HL["/docs/screenshots/neurima-audacity-step8-export-dialog-balanced.png","image"]
+0:{"buildId":"feWLDvu_VVvXkX-DUyro1","tree":{"name":"","paramType":null,"paramKey":"","hasRuntimePrefetch":false,"slots":{"children":{"name":"docs","paramType":null,"paramKey":"docs","hasRuntimePrefetch":false,"slots":{"children":{"name":"slug","paramType":"c","paramKey":"research/manual-ima-audacity","hasRuntimePrefetch":false,"slots":{"children":{"name":"__PAGE__","paramType":null,"paramKey":"__PAGE__","hasRuntimePrefetch":false,"slots":null,"isRootLayout":false}},"isRootLayout":false}},"isRootLayout":false}},"isRootLayout":true},"staleTime":300}
