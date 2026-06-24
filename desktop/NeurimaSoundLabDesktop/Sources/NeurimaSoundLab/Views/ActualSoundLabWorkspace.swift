@@ -105,6 +105,18 @@ final class ActualSoundLabStore: ObservableObject {
     @Published var toneReverbMix: Float = 0.22 { didSet { syncEngineParameters() } }
     @Published var toneDelayFeedback: Float = 0.25 { didSet { syncEngineParameters() } }
     @Published var toneMainGain: Float = 1.80 { didSet { syncEngineParameters() } }
+    @Published var liveOutputGain: Float = SoundLabLiveOutput.loadGain() {
+        didSet {
+            let clampedGain = SoundLabLiveOutput.clamped(liveOutputGain)
+            guard abs(liveOutputGain - clampedGain) < 0.001 else {
+                liveOutputGain = clampedGain
+                return
+            }
+            SoundLabLiveOutput.saveGain(clampedGain)
+            syncEngineParameters()
+            status = "Output \(SoundLabLiveOutput.percentText(for: clampedGain))"
+        }
+    }
     @Published var spacePreDelay: Float = 0.035 { didSet { syncEngineParameters() } }
     @Published var spaceDecay: Float = 0.72 { didSet { syncEngineParameters() } }
     @Published var spaceDamping: Float = 0.62 { didSet { syncEngineParameters() } }
@@ -1239,7 +1251,7 @@ final class ActualSoundLabStore: ObservableObject {
             reverbMix: toneReverbMix,
             delayFeedback: toneDelayFeedback,
             delayMix: padDelayMix,
-            mainGain: toneMainGain,
+            mainGain: toneMainGain * liveOutputGain,
             preDelay: spacePreDelay,
             decay: spaceDecay,
             damping: spaceDamping,
@@ -2384,6 +2396,17 @@ private struct ActualSoundDesignWorkspace: View {
                         }
                     }
 
+                    parameterPanel("Output") {
+                        Picker("Live Output", selection: liveOutputPreset) {
+                            ForEach(SoundLabLiveOutputPreset.allCases) { preset in
+                                Text(preset.rawValue).tag(preset)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        slider("Volume", value: $store.liveOutputGain, range: SoundLabLiveOutput.gainRange, display: SoundLabLiveOutput.percentText(for: store.liveOutputGain))
+                    }
+
                     parameterPanel("Evolution") {
                         slider("Echo Interval", value: $store.echoInterval, range: 3...20, display: "\(Int(store.echoInterval))s")
                         slider("Mutation", value: $store.mutationRate, range: 0.10...0.50, display: String(format: "%.2f", store.mutationRate))
@@ -2395,6 +2418,13 @@ private struct ActualSoundDesignWorkspace: View {
             .padding(22)
         }
         .background(style.sheetBackground)
+    }
+
+    private var liveOutputPreset: Binding<SoundLabLiveOutputPreset> {
+        Binding(
+            get: { SoundLabLiveOutputPreset.nearest(to: store.liveOutputGain) },
+            set: { store.liveOutputGain = $0.gain }
+        )
     }
 
     private func parameterPanel<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {

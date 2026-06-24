@@ -19,7 +19,7 @@ struct NeurimaSoundLabApp: App {
         }
 
         Settings {
-            SettingsView()
+            SettingsView(store: store)
                 .preferredColorScheme(AppearanceMode(rawValue: appearanceMode)?.colorScheme)
                 .modifier(AppAppearanceModeModifier(mode: appearanceMode))
         }
@@ -125,18 +125,47 @@ struct ActualSoundLabCommands: Commands {
 }
 
 private struct SettingsView: View {
+    @ObservedObject var store: ActualSoundLabStore
     @AppStorage("appearanceMode") private var appearanceMode = AppearanceMode.system.rawValue
 
     var body: some View {
         Form {
-            Picker("Appearance", selection: $appearanceMode) {
-                ForEach(AppearanceMode.allCases) { mode in
-                    Text(mode.rawValue).tag(mode.rawValue)
+            Section("Appearance") {
+                Picker("Appearance", selection: $appearanceMode) {
+                    ForEach(AppearanceMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode.rawValue)
+                    }
+                }
+            }
+
+            Section("Audio") {
+                Picker("Live Output", selection: liveOutputPreset) {
+                    ForEach(SoundLabLiveOutputPreset.allCases) { preset in
+                        Text(preset.rawValue).tag(preset)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Volume")
+                        Spacer()
+                        Text(SoundLabLiveOutput.percentText(for: store.liveOutputGain))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                    Slider(value: $store.liveOutputGain, in: SoundLabLiveOutput.gainRange)
                 }
             }
         }
         .formStyle(.grouped)
         .padding(24)
-        .frame(width: 420)
+        .frame(width: 460)
+    }
+
+    private var liveOutputPreset: Binding<SoundLabLiveOutputPreset> {
+        Binding(
+            get: { SoundLabLiveOutputPreset.nearest(to: store.liveOutputGain) },
+            set: { store.liveOutputGain = $0.gain }
+        )
     }
 }
