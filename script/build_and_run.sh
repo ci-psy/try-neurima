@@ -18,6 +18,7 @@ APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 METAL_SOURCE="$ROOT_DIR/../Neurima_DSP/Neurima/Views/Components/SoundLab/SoundLabPadShaders.metal"
+PACKAGE_ZIP="$DIST_DIR/Neurima-Sound-Lab-macOS.zip"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
@@ -65,6 +66,10 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
+if command -v codesign >/dev/null 2>&1; then
+  codesign --force --deep --sign - "$APP_BUNDLE" >/dev/null
+fi
+
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
   sleep 0.5
@@ -75,9 +80,21 @@ open_app() {
     -e "tell application \"System Events\" to tell process \"$APP_NAME\" to set size of window 1 to {1240, 780}" >/dev/null 2>&1 || true
 }
 
+package_app() {
+  rm -f "$PACKAGE_ZIP"
+  ditto -c -k --norsrc --keepParent "$APP_BUNDLE" "$PACKAGE_ZIP"
+  echo "$PACKAGE_ZIP"
+}
+
 case "$MODE" in
   run)
     open_app
+    ;;
+  --build|build)
+    echo "$APP_BUNDLE"
+    ;;
+  --package|package)
+    package_app
     ;;
   --debug|debug)
     lldb -- "$APP_BINARY"
@@ -96,7 +113,7 @@ case "$MODE" in
     pgrep -x "$APP_NAME" >/dev/null
     ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    echo "usage: $0 [run|--build|--package|--debug|--logs|--telemetry|--verify]" >&2
     exit 2
     ;;
 esac

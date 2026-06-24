@@ -152,6 +152,7 @@ final class ActualSoundLabStore: ObservableObject {
     private var shouldPersistSessions = false
     private var visualizerWindowController: NSWindowController?
     private var lastCanvasSize = CGSize(width: 900, height: 520)
+    private var lastLiveNoteStatusUpdate: CFTimeInterval = 0
     private var liveVoiceStartTimes: [Int: CFTimeInterval] = [:]
     private var deferredSustainVoiceIDs: [Int: CreationPlaybackBehavior.NoteEndStyle] = [:]
 
@@ -204,7 +205,7 @@ final class ActualSoundLabStore: ObservableObject {
         globalNoteCounter += 1
         let shapedVelocity = max(0.04, min(0.92, velocity * expressionScalar))
         let pan = pan(for: position)
-        status = noteName(midi)
+        updateLiveNoteStatus(midi: midi)
 
         switch repeatMode {
         case .off:
@@ -376,6 +377,13 @@ final class ActualSoundLabStore: ObservableObject {
             velocity: velocity,
             interactionMode: interactionMode
         ))
+    }
+
+    private func updateLiveNoteStatus(midi: Int) {
+        let now = CACurrentMediaTime()
+        guard now - lastLiveNoteStatusUpdate >= 0.08 else { return }
+        status = noteName(midi)
+        lastLiveNoteStatusUpdate = now
     }
 
     func toggleRecording() {
@@ -2022,7 +2030,6 @@ private struct ActualCanvasChrome: ViewModifier {
         if rounded {
             content
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .stroke(border, lineWidth: 1)
