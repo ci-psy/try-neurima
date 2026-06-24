@@ -4,3 +4,5 @@ site/.next/
 site/out/
 .DS_Store
 .next/
+dist/
+desktop/NeurimaSoundLabDesktop/.build/
