@@ -23,15 +23,23 @@ struct ActualSoundLabTransport: View {
     let onSustainChanged: (Bool) -> Void
 
     var body: some View {
-        GlassEffectContainer(spacing: DS.Spacing.lg) {
-            HStack(spacing: DS.Spacing.lg) {
-                recordButton
-                infoCenter
-                playButton
+        if #available(macOS 26.0, *) {
+            GlassEffectContainer(spacing: DS.Spacing.lg) {
+                content
             }
+            .transportChromePadding()
+        } else {
+            content
+                .transportChromePadding()
         }
-        .padding(.horizontal, DS.Spacing.xl)
-        .padding(.bottom, DS.Spacing.xs)
+    }
+
+    private var content: some View {
+        HStack(spacing: DS.Spacing.lg) {
+            recordButton
+            infoCenter
+            playButton
+        }
         .animation(DS.Motion.quick, value: isRecording)
         .animation(DS.Motion.quick, value: isPlaybackActive)
     }
@@ -47,7 +55,7 @@ struct ActualSoundLabTransport: View {
             .foregroundStyle(style.accent)
             .frame(width: 50, height: 50)
             .contentShape(.circle)
-            .glassEffect(.regular.interactive(), in: .circle)
+            .transportGlass(in: Circle())
         }
         .buttonStyle(.plain)
     }
@@ -72,7 +80,7 @@ struct ActualSoundLabTransport: View {
         .frame(minHeight: 50)
         .frame(maxWidth: .infinity)
         .contentShape(.capsule)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .transportGlass(in: Capsule())
         .overlay {
             GeometryReader { geometry in
                 HStack(spacing: 0) {
@@ -140,7 +148,7 @@ struct ActualSoundLabTransport: View {
             .foregroundStyle(isPlaybackActive ? style.accent : style.interactiveAccent)
             .frame(width: 50, height: 50)
             .contentShape(.circle)
-            .glassEffect(.regular.interactive(), in: .circle)
+            .transportGlass(in: Circle())
         }
         .buttonStyle(.plain)
         .opacity(canPlay ? 1 : 0.35)
@@ -188,5 +196,26 @@ struct ActualSoundLabTransport: View {
     private func formatDisplay(_ value: Int) -> String {
         if value > 9_999 { return String(value) }
         return String(format: "%04d", value)
+    }
+}
+
+private extension View {
+    func transportChromePadding() -> some View {
+        self
+            .padding(.horizontal, DS.Spacing.xl)
+            .padding(.bottom, DS.Spacing.xs)
+    }
+
+    @ViewBuilder
+    func transportGlass<S: InsettableShape>(in shape: S) -> some View {
+        if #available(macOS 26.0, *) {
+            self.glassEffect(.regular.interactive(), in: shape)
+        } else {
+            self
+                .background(.thinMaterial, in: shape)
+                .overlay {
+                    shape.stroke(.white.opacity(0.13), lineWidth: 1)
+                }
+        }
     }
 }

@@ -48,6 +48,11 @@ private final class PlaybackCancellationFlag: Sendable {
     }
 }
 
+private final class SoundLabVisualizerWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
 private func soundLabFrequency(for midi: Int) -> Float {
     440.0 * powf(2.0, Float(midi - 69) / 12.0)
 }
@@ -102,9 +107,9 @@ final class ActualSoundLabStore: ObservableObject {
     @Published var playheadProgress: Double = 0
     @Published var playbackHighlightState = SoundLabPlaybackHighlightState.inactive
 
-    @Published var toneReverbMix: Float = 0.22 { didSet { syncEngineParameters() } }
-    @Published var toneDelayFeedback: Float = 0.25 { didSet { syncEngineParameters() } }
-    @Published var toneMainGain: Float = 1.80 { didSet { syncEngineParameters() } }
+    @Published var toneReverbMix: Float = 0.28 { didSet { syncEngineParameters() } }
+    @Published var toneDelayFeedback: Float = 0.28 { didSet { syncEngineParameters() } }
+    @Published var toneMainGain: Float = 1.65 { didSet { syncEngineParameters() } }
     @Published var liveOutputGain: Float = SoundLabLiveOutput.loadGain() {
         didSet {
             let clampedGain = SoundLabLiveOutput.clamped(liveOutputGain)
@@ -117,16 +122,16 @@ final class ActualSoundLabStore: ObservableObject {
             status = "Output \(SoundLabLiveOutput.percentText(for: clampedGain))"
         }
     }
-    @Published var spacePreDelay: Float = 0.035 { didSet { syncEngineParameters() } }
-    @Published var spaceDecay: Float = 0.72 { didSet { syncEngineParameters() } }
-    @Published var spaceDamping: Float = 0.62 { didSet { syncEngineParameters() } }
-    @Published var spaceBody: Float = 0.55 { didSet { syncEngineParameters() } }
+    @Published var spacePreDelay: Float = 0.048 { didSet { syncEngineParameters() } }
+    @Published var spaceDecay: Float = 0.80 { didSet { syncEngineParameters() } }
+    @Published var spaceDamping: Float = 0.56 { didSet { syncEngineParameters() } }
+    @Published var spaceBody: Float = 0.62 { didSet { syncEngineParameters() } }
     @Published var echoTempo: Double = 4 {
         didSet { resetSessionEchoDelay() }
     }
     @Published var echoRepeatCount: Int = 15
     @Published var stereoWidth: Float = 1.0
-    @Published var padDelayMix: Float = 0.25 { didSet { syncEngineParameters() } }
+    @Published var padDelayMix: Float = 0.30 { didSet { syncEngineParameters() } }
     @Published var mutationRate: Float = 0.30 {
         didSet { evolutionEngine.config.mutationRate = mutationRate }
     }
@@ -137,7 +142,7 @@ final class ActualSoundLabStore: ObservableObject {
         didSet { evolutionEngine.config.scaleLock = scaleLock }
     }
 
-    private let audio = ActualSoundLabAudioHost()
+    private let audio = ActualSoundLabAudioHost(qualityProfile: .desktopHighQuality)
     private let evolutionEngine = NoteEvolutionEngine()
     private var playbackTask: Task<Void, Never>?
     private var playbackHighlightTask: Task<Void, Never>?
@@ -151,6 +156,7 @@ final class ActualSoundLabStore: ObservableObject {
     private var pointerLastTransitionTime: CFTimeInterval = 0
     private var shouldPersistSessions = false
     private var visualizerWindowController: NSWindowController?
+    private var previousVisualizerPresentationOptions: NSApplication.PresentationOptions?
     private var lastCanvasSize = CGSize(width: 900, height: 520)
     private var lastLiveNoteStatusUpdate: CFTimeInterval = 0
     private var liveVoiceStartTimes: [Int: CFTimeInterval] = [:]
@@ -663,8 +669,9 @@ final class ActualSoundLabStore: ObservableObject {
     }
 
     func openVisualizerWindow(startPlayback shouldStartPlayback: Bool = false) {
+        let targetScreen = NSApp.keyWindow?.screen ?? NSApp.mainWindow?.screen ?? NSScreen.main
         if let window = visualizerWindowController?.window {
-            presentVisualizerWindow(window)
+            presentVisualizerWindow(window, on: targetScreen)
             if shouldStartPlayback && !isPlaying {
                 startPlayback()
             }
@@ -674,19 +681,21 @@ final class ActualSoundLabStore: ObservableObject {
         let hostingController = NSHostingController(
             rootView: ActualSoundLabVisualizerWindow(store: self)
         )
-        let window = NSWindow(contentViewController: hostingController)
+        let window = SoundLabVisualizerWindow(contentViewController: hostingController)
         window.title = "Visualizer"
         window.styleMask = [.borderless, .resizable, .fullSizeContentView]
-        window.backgroundColor = .clear
-        window.isOpaque = false
+        window.backgroundColor = NSColor(calibratedWhite: 0.13, alpha: 1)
+        window.isOpaque = true
+        window.acceptsMouseMovedEvents = true
         window.isReleasedWhenClosed = false
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        window.level = .screenSaver
+        window.collectionBehavior = [.moveToActiveSpace]
+        window.level = .floating
+        window.hidesOnDeactivate = false
+        window.ignoresMouseEvents = false
 
         let controller = NSWindowController(window: window)
         visualizerWindowController = controller
-        controller.showWindow(nil)
-        presentVisualizerWindow(window)
+        presentVisualizerWindow(window, on: targetScreen)
         if shouldStartPlayback && !isPlaying {
             startPlayback()
         }
@@ -695,13 +704,32 @@ final class ActualSoundLabStore: ObservableObject {
     func closeVisualizerWindow() {
         visualizerWindowController?.close()
         visualizerWindowController = nil
+        restoreVisualizerPresentationOptions()
     }
 
-    private func presentVisualizerWindow(_ window: NSWindow) {
-        let frame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        window.setFrame(frame, display: true)
+    private func presentVisualizerWindow(_ window: NSWindow, on screen: NSScreen?) {
+        enterVisualizerPresentationOptions()
+
+        let frame = screen?.frame ?? NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        window.setFrame(frame.integral, display: true)
+
+        window.acceptsMouseMovedEvents = true
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func enterVisualizerPresentationOptions() {
+        guard previousVisualizerPresentationOptions == nil else { return }
+        let previousOptions = NSApp.presentationOptions
+        previousVisualizerPresentationOptions = previousOptions
+        NSApp.presentationOptions = previousOptions.union([.autoHideDock, .autoHideMenuBar])
+    }
+
+    private func restoreVisualizerPresentationOptions() {
+        if let previousVisualizerPresentationOptions {
+            NSApp.presentationOptions = previousVisualizerPresentationOptions
+        }
+        previousVisualizerPresentationOptions = nil
     }
 
     func binding<T>(_ keyPath: ReferenceWritableKeyPath<ActualSoundLabStore, T>) -> Binding<T> {
@@ -1322,20 +1350,25 @@ final class ActualSoundLabStore: ObservableObject {
 
 private final class ActualSoundLabAudioHost: @unchecked Sendable {
     private let engine = AVAudioEngine()
+    private let qualityProfile: CreationSynthQualityProfile
     private var synth: CreationSynthEngine?
     private var sourceNode: AVAudioSourceNode?
     private let renderBufferSize = 4_096
     private var renderBufferL: UnsafeMutablePointer<Float>?
     private var renderBufferR: UnsafeMutablePointer<Float>?
     private var voiceType: CreationVoiceType = .etherealPiano
-    private var reverbMix: Float = 0.22
-    private var delayFeedback: Float = 0.25
-    private var delayMix: Float = 0.25
-    private var mainGain: Float = 1.8
-    private var preDelay: Float = 0.035
-    private var decay: Float = 0.72
-    private var damping: Float = 0.62
-    private var body: Float = 0.55
+    private var reverbMix: Float = 0.28
+    private var delayFeedback: Float = 0.28
+    private var delayMix: Float = 0.30
+    private var mainGain: Float = 1.65
+    private var preDelay: Float = 0.048
+    private var decay: Float = 0.80
+    private var damping: Float = 0.56
+    private var body: Float = 0.62
+
+    init(qualityProfile: CreationSynthQualityProfile) {
+        self.qualityProfile = qualityProfile
+    }
 
     deinit {
         engine.stop()
@@ -1366,7 +1399,11 @@ private final class ActualSoundLabAudioHost: @unchecked Sendable {
     private func configureGraph() -> Bool {
         let outputFormat = engine.outputNode.outputFormat(forBus: 0)
         let nativeSampleRate = outputFormat.sampleRate > 0 ? outputFormat.sampleRate : 44_100
-        let synthEngine = CreationSynthEngine(sampleRate: Float(nativeSampleRate), voiceType: voiceType)
+        let synthEngine = CreationSynthEngine(
+            sampleRate: Float(nativeSampleRate),
+            voiceType: voiceType,
+            qualityProfile: qualityProfile
+        )
         self.synth = synthEngine
         applyConfiguration(to: synthEngine)
 
@@ -1791,7 +1828,9 @@ struct ActualSoundLabShellView: View {
                         .fixedSize()
                 }
 
-                ToolbarSpacer(.fixed, placement: .primaryAction)
+                if #available(macOS 26.0, *) {
+                    ToolbarSpacer(.fixed, placement: .primaryAction)
+                }
 
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button {
@@ -1994,6 +2033,7 @@ private struct ActualCreationWorkspace: View {
 private struct ActualSoundLabCanvasSurface: View {
     @ObservedObject var store: ActualSoundLabStore
     let rounded: Bool
+    var onPointerActivity: (() -> Void)?
     @Environment(\.soundLabUIStyle) private var style
 
     var body: some View {
@@ -2007,7 +2047,8 @@ private struct ActualSoundLabCanvasSurface: View {
                 onNoteRetrigger: store.retriggerNote,
                 onNoteEnded: store.endNote,
                 onAllTouchesLifted: store.releaseAllNotes,
-                externalSpawns: $store.pendingCanvasSpawns
+                externalSpawns: $store.pendingCanvasSpawns,
+                onPointerActivity: onPointerActivity
             )
             .background { style.visualizerBackground }
             .modifier(ActualCanvasChrome(rounded: rounded, border: style.panelBorder))
@@ -2040,66 +2081,6 @@ private struct ActualCanvasChrome: ViewModifier {
     }
 }
 
-private struct VisualizerPointerActivityView: NSViewRepresentable {
-    let onActivity: () -> Void
-
-    func makeNSView(context: Context) -> PointerActivityNSView {
-        let view = PointerActivityNSView()
-        view.onActivity = onActivity
-        return view
-    }
-
-    func updateNSView(_ nsView: PointerActivityNSView, context: Context) {
-        nsView.onActivity = onActivity
-    }
-
-    final class PointerActivityNSView: NSView {
-        var onActivity: (() -> Void)?
-        private var pointerTrackingArea: NSTrackingArea?
-
-        override init(frame frameRect: NSRect) {
-            super.init(frame: frameRect)
-            wantsLayer = true
-            layer?.backgroundColor = NSColor.clear.cgColor
-        }
-
-        @available(*, unavailable)
-        required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            window?.acceptsMouseMovedEvents = true
-        }
-
-        override func updateTrackingAreas() {
-            super.updateTrackingAreas()
-            if let pointerTrackingArea {
-                removeTrackingArea(pointerTrackingArea)
-            }
-
-            let trackingArea = NSTrackingArea(
-                rect: bounds,
-                options: [.activeAlways, .inVisibleRect, .mouseEnteredAndExited, .mouseMoved],
-                owner: self
-            )
-            pointerTrackingArea = trackingArea
-            addTrackingArea(trackingArea)
-        }
-
-        override func mouseEntered(with event: NSEvent) {
-            onActivity?()
-        }
-
-        override func mouseMoved(with event: NSEvent) {
-            onActivity?()
-        }
-
-        override func hitTest(_ point: NSPoint) -> NSView? {
-            nil
-        }
-    }
-}
-
 struct ActualSoundLabVisualizerWindow: View {
     @ObservedObject var store: ActualSoundLabStore
     @AppStorage("appearanceMode") private var appearanceMode = AppearanceMode.system.rawValue
@@ -2107,7 +2088,7 @@ struct ActualSoundLabVisualizerWindow: View {
     @State private var isPointerOverChrome = false
     @State private var lastPointerActivityTime: CFTimeInterval = 0
     @State private var hideChromeTask: Task<Void, Never>?
-    @State private var escapeKeyMonitor: Any?
+    @State private var interactionEventMonitor: Any?
 
     private var isImmersiveActive: Bool {
         store.isPlaying || store.isEvolving
@@ -2118,38 +2099,25 @@ struct ActualSoundLabVisualizerWindow: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            ActualSoundLabCanvasSurface(store: store, rounded: false)
-                .ignoresSafeArea()
-
-            VisualizerPointerActivityView {
-                handlePointerActivity()
-            }
+        ZStack {
+            ActualSoundLabCanvasSurface(
+                store: store,
+                rounded: false,
+                onPointerActivity: handlePointerActivity
+            )
             .ignoresSafeArea()
-
-            visualizerChrome
-                .opacity(isChromeVisible ? 1 : 0)
-                .allowsHitTesting(isChromeVisible)
-                .animation(.easeOut(duration: 0.55), value: isChromeVisible)
-                .onHover { hovering in
-                    isPointerOverChrome = hovering
-                    if hovering {
-                        revealChrome(cancelPendingFade: true)
-                    } else {
-                        scheduleChromeFade()
-                    }
-                }
-                .onContinuousHover { phase in
-                    if case .active = phase {
-                        handlePointerActivity()
-                    }
-                }
+        }
+        .overlay(alignment: .top) {
+            chromeOverlay(visualizerTopChrome)
+        }
+        .overlay(alignment: .bottom) {
+            chromeOverlay(visualizerBottomChrome)
         }
         .background(ThemeColors.visualizerBackground(for: .default))
         .soundLabUIStyle(.neurima(theme: .default))
         .preferredColorScheme(AppearanceMode(rawValue: appearanceMode)?.colorScheme)
         .onAppear {
-            installEscapeKeyMonitor()
+            installInteractionEventMonitor()
             lastPointerActivityTime = CACurrentMediaTime()
             handleImmersiveStateChanged()
         }
@@ -2162,78 +2130,96 @@ struct ActualSoundLabVisualizerWindow: View {
         .onDisappear {
             hideChromeTask?.cancel()
             hideChromeTask = nil
-            removeEscapeKeyMonitor()
+            removeInteractionEventMonitor()
         }
         .onExitCommand {
             store.closeVisualizerWindow()
         }
     }
 
-    private var visualizerChrome: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(store.status)
-                        .font(.title3.weight(.semibold))
-                    Text("\(store.voiceType.label) | \(store.keyName) \(store.selectedMode.displayName) | \(store.phrases.count) phrases")
-                        .font(.callout.monospacedDigit())
-                        .foregroundStyle(ThemeColors.secondary(for: .default))
+    private func chromeOverlay<Content: View>(_ content: Content) -> some View {
+        content
+            .opacity(isChromeVisible ? 1 : 0)
+            .allowsHitTesting(isChromeVisible)
+            .animation(.easeOut(duration: 0.55), value: isChromeVisible)
+            .onHover { hovering in
+                isPointerOverChrome = hovering
+                if hovering {
+                    revealChrome(cancelPendingFade: true)
+                } else {
+                    scheduleChromeFade()
                 }
-
-                Spacer()
-
-                EffectModeControl(selection: $store.interactionMode)
-
-                Button {
-                    store.toggleEvolution()
-                } label: {
-                    Label(store.isEvolving ? "Evolving" : "Evolve", systemImage: "sparkles")
-                }
-
-                Button {
-                    store.exportCurrentSession()
-                } label: {
-                    Label("Export", systemImage: "square.and.arrow.down")
-                }
-                .disabled(store.phrases.isEmpty || store.isExporting)
-
-                Button {
-                    store.closeVisualizerWindow()
-                } label: {
-                    Image(systemName: "arrow.down.right.and.arrow.up.left")
-                }
-                .buttonStyle(.borderless)
-                .help("Close visualizer")
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 18)
+            .onContinuousHover { phase in
+                if case .active = phase {
+                    handlePointerActivity()
+                }
+            }
+    }
+
+    private var visualizerTopChrome: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(store.status)
+                    .font(.title3.weight(.semibold))
+                Text("\(store.voiceType.label) | \(store.keyName) \(store.selectedMode.displayName) | \(store.phrases.count) phrases")
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(ThemeColors.secondary(for: .default))
+            }
 
             Spacer()
 
-            ActualSoundLabTransport(
-                isRecording: store.isRecording,
-                isPlaybackActive: store.isPlaying,
-                phraseCount: store.phrases.count,
-                currentRecordingNotes: store.currentRecordingNotes,
-                canPlay: !store.phrases.isEmpty,
-                keyName: store.keyName,
-                isExpressionActive: store.isExpressionActive,
-                expressionScalar: store.expressionScalar,
-                isSustainActive: store.isSustainActive,
-                onRecordToggle: store.toggleRecording,
-                onPlayToggle: store.togglePlayback,
-                onExpressionChanged: { value in
-                    store.setExpressionScalar(value)
-                },
-                onExpressionEnded: {
-                    store.resetExpression()
-                },
-                onSustainChanged: { value in
-                    store.setSustainActive(value)
-                }
-            )
-            .padding(.bottom, 26)
+            EffectModeControl(selection: $store.interactionMode)
+
+            Button {
+                store.toggleEvolution()
+            } label: {
+                Label(store.isEvolving ? "Evolving" : "Evolve", systemImage: "sparkles")
+            }
+
+            Button {
+                store.exportCurrentSession()
+            } label: {
+                Label("Export", systemImage: "square.and.arrow.down")
+            }
+            .disabled(store.phrases.isEmpty || store.isExporting)
+
+            Button {
+                store.closeVisualizerWindow()
+            } label: {
+                Image(systemName: "arrow.down.right.and.arrow.up.left")
+            }
+            .buttonStyle(.borderless)
+            .help("Close visualizer")
         }
+        .padding(.horizontal, 24)
+        .padding(.top, 18)
+    }
+
+    private var visualizerBottomChrome: some View {
+        ActualSoundLabTransport(
+            isRecording: store.isRecording,
+            isPlaybackActive: store.isPlaying,
+            phraseCount: store.phrases.count,
+            currentRecordingNotes: store.currentRecordingNotes,
+            canPlay: !store.phrases.isEmpty,
+            keyName: store.keyName,
+            isExpressionActive: store.isExpressionActive,
+            expressionScalar: store.expressionScalar,
+            isSustainActive: store.isSustainActive,
+            onRecordToggle: store.toggleRecording,
+            onPlayToggle: store.togglePlayback,
+            onExpressionChanged: { value in
+                store.setExpressionScalar(value)
+            },
+            onExpressionEnded: {
+                store.resetExpression()
+            },
+            onSustainChanged: { value in
+                store.setSustainActive(value)
+            }
+        )
+        .padding(.bottom, 26)
     }
 
     private func handleImmersiveStateChanged() {
@@ -2294,20 +2280,36 @@ struct ActualSoundLabVisualizerWindow: View {
         }
     }
 
-    private func installEscapeKeyMonitor() {
-        guard escapeKeyMonitor == nil else { return }
-        escapeKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            guard event.keyCode == 53 else { return event }
-            store.closeVisualizerWindow()
-            return nil
+    private func installInteractionEventMonitor() {
+        guard interactionEventMonitor == nil else { return }
+        interactionEventMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [
+                .keyDown,
+                .mouseMoved,
+                .leftMouseDown,
+                .leftMouseDragged,
+                .rightMouseDragged,
+                .otherMouseDragged,
+            ]
+        ) { event in
+            switch event.type {
+            case .keyDown where event.keyCode == 53:
+                store.closeVisualizerWindow()
+                return nil
+            case .mouseMoved, .leftMouseDown, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged:
+                handlePointerActivity()
+                return event
+            default:
+                return event
+            }
         }
     }
 
-    private func removeEscapeKeyMonitor() {
-        if let escapeKeyMonitor {
-            NSEvent.removeMonitor(escapeKeyMonitor)
+    private func removeInteractionEventMonitor() {
+        if let interactionEventMonitor {
+            NSEvent.removeMonitor(interactionEventMonitor)
         }
-        escapeKeyMonitor = nil
+        interactionEventMonitor = nil
     }
 }
 

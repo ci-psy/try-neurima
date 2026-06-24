@@ -101,8 +101,10 @@ struct SoundLabArrangementLane: View, Equatable {
         .frame(height: 106)
         .containerShape(laneShape)
         .background {
-            ConcentricRectangle(corners: .concentric)
-                .fill(ThemeColors.panelOverlay(for: appTheme).opacity(0.5))
+            compatibleConcentricFill(
+                ThemeColors.panelOverlay(for: appTheme).opacity(0.5),
+                cornerRadius: DS.Radius.md
+            )
         }
         .clipShape(laneShape)
         .overlay {
@@ -217,8 +219,7 @@ private struct RecordingBlockView: View {
         let blockShape = RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
 
         VStack(alignment: .leading, spacing: DS.Spacing.xxs) {
-            ConcentricRectangle(corners: .concentric)
-                .fill(accent.opacity(0.08))
+            compatibleConcentricFill(accent.opacity(0.08), cornerRadius: DS.Radius.sm)
                 .frame(height: 56)
                 .overlay(
                     Circle()
@@ -240,8 +241,7 @@ private struct RecordingBlockView: View {
         .frame(width: 52)
         .containerShape(blockShape)
         .background {
-            ConcentricRectangle(corners: .concentric)
-                .fill(accent.opacity(0.06))
+            compatibleConcentricFill(accent.opacity(0.06), cornerRadius: DS.Radius.sm)
         }
         .clipShape(blockShape)
         .overlay {
@@ -473,8 +473,7 @@ private struct PhraseBlockView: View, Equatable {
     @ViewBuilder
     private func phraseBlockBackground(fillOpacity: Double, glowOpacity: Double) -> some View {
         ZStack {
-            ConcentricRectangle(corners: .concentric)
-                .fill(accent.opacity(fillOpacity))
+            compatibleConcentricFill(accent.opacity(fillOpacity), cornerRadius: DS.Radius.sm)
 
             if glowOpacity > 0 {
                 LinearGradient(
@@ -534,5 +533,16 @@ private struct PhraseBlockView: View, Equatable {
         if isSelected { values.append("Selected") }
         if isActive { values.append("Playing") }
         return values.joined(separator: ", ")
+    }
+}
+
+@ViewBuilder
+private func compatibleConcentricFill(_ color: Color, cornerRadius: CGFloat) -> some View {
+    if #available(macOS 26.0, *) {
+        ConcentricRectangle(corners: .concentric)
+            .fill(color)
+    } else {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(color)
     }
 }
