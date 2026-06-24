@@ -49,8 +49,28 @@ private final class PlaybackCancellationFlag: Sendable {
 }
 
 private final class SoundLabVisualizerWindow: NSWindow {
+    var onRequestClose: (() -> Void)?
+    var onDidClose: (() -> Void)?
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    override func cancelOperation(_ sender: Any?) {
+        onRequestClose?() ?? close()
+    }
+
+    override func keyDown(with event: NSEvent) {
+        guard event.keyCode == 53 else {
+            super.keyDown(with: event)
+            return
+        }
+        onRequestClose?() ?? close()
+    }
+
+    override func close() {
+        super.close()
+        onDidClose?()
+    }
 }
 
 private func soundLabFrequency(for midi: Int) -> Float {
@@ -692,6 +712,13 @@ final class ActualSoundLabStore: ObservableObject {
         window.level = .floating
         window.hidesOnDeactivate = false
         window.ignoresMouseEvents = false
+        window.onRequestClose = { [weak self] in
+            self?.closeVisualizerWindow()
+        }
+        window.onDidClose = { [weak self, weak window] in
+            guard let window else { return }
+            self?.handleVisualizerWindowDidClose(window)
+        }
 
         let controller = NSWindowController(window: window)
         visualizerWindowController = controller
@@ -702,9 +729,33 @@ final class ActualSoundLabStore: ObservableObject {
     }
 
     func closeVisualizerWindow() {
-        visualizerWindowController?.close()
+        guard let controller = visualizerWindowController else {
+            completeVisualizerWindowDismissal()
+            return
+        }
+
+        let window = controller.window
         visualizerWindowController = nil
-        restoreVisualizerPresentationOptions()
+        if let visualizerWindow = window as? SoundLabVisualizerWindow {
+            visualizerWindow.onRequestClose = nil
+            visualizerWindow.onDidClose = nil
+        }
+        controller.close()
+        completeVisualizerWindowDismissal()
+    }
+
+    private func handleVisualizerWindowDidClose(_ window: NSWindow) {
+        guard visualizerWindowController?.window === window else {
+            completeVisualizerWindowDismissal()
+            return
+        }
+
+        if let visualizerWindow = window as? SoundLabVisualizerWindow {
+            visualizerWindow.onRequestClose = nil
+            visualizerWindow.onDidClose = nil
+        }
+        visualizerWindowController = nil
+        completeVisualizerWindowDismissal()
     }
 
     private func presentVisualizerWindow(_ window: NSWindow, on screen: NSScreen?) {
@@ -730,6 +781,24 @@ final class ActualSoundLabStore: ObservableObject {
             NSApp.presentationOptions = previousVisualizerPresentationOptions
         }
         previousVisualizerPresentationOptions = nil
+    }
+
+    private func completeVisualizerWindowDismissal() {
+        restoreVisualizerPresentationOptions()
+        reactivatePrimaryWindowAfterVisualizerDismissal()
+    }
+
+    private func reactivatePrimaryWindowAfterVisualizerDismissal() {
+        let primaryWindow = NSApp.windows.first { window in
+            guard window.isVisible,
+                  window.canBecomeMain,
+                  !(window is SoundLabVisualizerWindow) else {
+                return false
+            }
+            return true
+        }
+        primaryWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func binding<T>(_ keyPath: ReferenceWritableKeyPath<ActualSoundLabStore, T>) -> Binding<T> {
@@ -2088,7 +2157,6 @@ struct ActualSoundLabVisualizerWindow: View {
     @State private var isPointerOverChrome = false
     @State private var lastPointerActivityTime: CFTimeInterval = 0
     @State private var hideChromeTask: Task<Void, Never>?
-    @State private var interactionEventMonitor: Any?
 
     private var isImmersiveActive: Bool {
         store.isPlaying || store.isEvolving
@@ -2117,7 +2185,6 @@ struct ActualSoundLabVisualizerWindow: View {
         .soundLabUIStyle(.neurima(theme: .default))
         .preferredColorScheme(AppearanceMode(rawValue: appearanceMode)?.colorScheme)
         .onAppear {
-            installInteractionEventMonitor()
             lastPointerActivityTime = CACurrentMediaTime()
             handleImmersiveStateChanged()
         }
@@ -2130,7 +2197,6 @@ struct ActualSoundLabVisualizerWindow: View {
         .onDisappear {
             hideChromeTask?.cancel()
             hideChromeTask = nil
-            removeInteractionEventMonitor()
         }
         .onExitCommand {
             store.closeVisualizerWindow()
@@ -2278,38 +2344,6 @@ struct ActualSoundLabVisualizerWindow: View {
             isPointerOverChrome = false
             NSCursor.setHiddenUntilMouseMoves(true)
         }
-    }
-
-    private func installInteractionEventMonitor() {
-        guard interactionEventMonitor == nil else { return }
-        interactionEventMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [
-                .keyDown,
-                .mouseMoved,
-                .leftMouseDown,
-                .leftMouseDragged,
-                .rightMouseDragged,
-                .otherMouseDragged,
-            ]
-        ) { event in
-            switch event.type {
-            case .keyDown where event.keyCode == 53:
-                store.closeVisualizerWindow()
-                return nil
-            case .mouseMoved, .leftMouseDown, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged:
-                handlePointerActivity()
-                return event
-            default:
-                return event
-            }
-        }
-    }
-
-    private func removeInteractionEventMonitor() {
-        if let interactionEventMonitor {
-            NSEvent.removeMonitor(interactionEventMonitor)
-        }
-        interactionEventMonitor = nil
     }
 }
 
