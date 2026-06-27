@@ -5,6 +5,7 @@ import SwiftUI
 
 struct ActualSoundLabTransport: View {
     @Environment(\.soundLabUIStyle) private var style
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private static let minimumExpressionScalar: Float = 0.15
 
     let isRecording: Bool
@@ -40,8 +41,8 @@ struct ActualSoundLabTransport: View {
             infoCenter
             playButton
         }
-        .animation(DS.Motion.quick, value: isRecording)
-        .animation(DS.Motion.quick, value: isPlaybackActive)
+        .animation(reduceMotion ? nil : DS.Motion.quick, value: isRecording)
+        .animation(reduceMotion ? nil : DS.Motion.quick, value: isPlaybackActive)
     }
 
     private var recordButton: some View {
