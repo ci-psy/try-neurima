@@ -135,6 +135,8 @@ struct ActualSoundLabCommands: Commands {
 private struct SettingsView: View {
     @ObservedObject var store: ActualSoundLabStore
     @AppStorage("appearanceMode") private var appearanceMode = AppearanceMode.system.rawValue
+    @AppStorage("soundlab.showPerformanceHUD") private var showPerformanceHUD = false
+    @AppStorage("soundlab.padPowerSaver") private var padPowerSaver = false
 
     var body: some View {
         Form {
@@ -163,6 +165,15 @@ private struct SettingsView: View {
                     }
                     Slider(value: $store.liveOutputGain, in: SoundLabLiveOutput.gainRange)
                 }
+            }
+
+            Section {
+                Toggle("Show performance overlay (FPS)", isOn: $showPerformanceHUD)
+                Toggle("Power saver — pause canvas when idle", isOn: $padPowerSaver)
+            } header: {
+                Text("Performance")
+            } footer: {
+                Text("The FPS overlay can also be toggled with ⌘⌥P. Power saver pauses the visual canvas when nothing is playing to save energy, at the cost of a brief catch-up on the next interaction — turn it off for the smoothest response.")
             }
         }
         .formStyle(.grouped)
