@@ -57,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 struct ActualSoundLabCommands: Commands {
     let store: ActualSoundLabStore
+    @AppStorage("soundlab.showPerformanceHUD") private var showPerformanceHUD = false
 
     var body: some Commands {
         CommandMenu("Sound Lab") {
@@ -120,6 +121,13 @@ struct ActualSoundLabCommands: Commands {
             Button("Clear Timeline") {
                 store.clear()
             }
+
+            Divider()
+
+            Button(showPerformanceHUD ? "Hide Performance HUD" : "Show Performance HUD") {
+                showPerformanceHUD.toggle()
+            }
+            .keyboardShortcut("p", modifiers: [.command, .option])
         }
     }
 }
